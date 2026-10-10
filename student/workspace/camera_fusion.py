@@ -31,7 +31,16 @@ def is_in_field_of_view(x: Matrix, sensor: Any) -> bool:
     # vi: TODO Part G — p_s = R @ p + t; loại tọa độ không hữu hạn.
     # vi: Camera cần x_s > 1e-6; FOV từ nội tại và bề rộng ảnh.
     # vi: Với cả lidar/camera: kiểm tra atan2(y_s, x_s) nằm trong sensor.fov.
-    raise NotImplementedError("TODO: implement is_in_field_of_view")
+    position = np.asarray(x, dtype=float).reshape(-1)[:3]
+    transform = np.asarray(sensor.veh_to_sens, dtype=float)
+    sensor_position = transform[:3, :3] @ position + transform[:3, 3]
+    if not np.isfinite(sensor_position).all():
+        return False
+    if getattr(sensor, "name", None) == "camera" and sensor_position[0] <= 1e-6:
+        return False
+    angle = float(np.arctan2(sensor_position[1], sensor_position[0]))
+    lower, upper = sensor.fov
+    return bool(np.isfinite(angle) and lower <= angle <= upper)
 
 
 def camera_measurement_prediction(x: Matrix, sensor: Any) -> Matrix:
@@ -51,7 +60,19 @@ def camera_measurement_prediction(x: Matrix, sensor: Any) -> Matrix:
     # vi: TODO Part G — tính p_s = R @ p + t; trước phép chia kiểm tra hữu hạn
     # vi: và x_s > 1e-6, ngược lại raise ValueError có tọa độ.
     # vi: u = c_i - f_i * y_s/x_s; v = c_j - f_j * z_s/x_s.
-    raise NotImplementedError("TODO: implement camera_measurement_prediction")
+    position = np.asarray(x, dtype=float).reshape(-1)[:3]
+    transform = np.asarray(sensor.veh_to_sens, dtype=float)
+    sensor_position = transform[:3, :3] @ position + transform[:3, 3]
+    if not np.isfinite(sensor_position).all() or sensor_position[0] <= 1e-6:
+        raise ValueError(
+            "Camera projection needs finite coordinates and positive depth > 1e-6; "
+            f"sensor position={sensor_position.tolist()}"
+        )
+    depth, left, up = sensor_position
+    return np.asmatrix([
+        sensor.c_i - sensor.f_i * left / depth,
+        sensor.c_j - sensor.f_j * up / depth,
+    ]).T
 
 
 def build_camera_measurement(z: Sequence[float], sensor: Any) -> dict[str, Any]:
@@ -65,4 +86,11 @@ def build_camera_measurement(z: Sequence[float], sensor: Any) -> dict[str, Any]:
         Dict with keys ``z``, ``R``, ``sensor``.
     """
     # vi: TODO Part G — z mat 2x1; R diag sigma_cam_i^2, sigma_cam_j^2 từ params.
-    raise NotImplementedError("TODO: implement build_camera_measurement")
+    from fusion_lab.workspace_support import get_tracking_params
+    params = get_tracking_params()
+    z_mat = np.asmatrix(np.asarray(z, dtype=float).reshape(2, 1))
+    R = np.asmatrix(np.diag([
+        float(params.sigma_cam_i) ** 2,
+        float(params.sigma_cam_j) ** 2,
+    ]))
+    return {"z": z_mat, "R": R, "sensor": sensor}

@@ -4,19 +4,19 @@
 
 ## Thông tin học viên
 
-- Họ tên:
-- MSSV:
+- Họ tên: Ngo The Viet
+- MSSV: 02594
 - Email:
-- Link repo (fork):
-- Commit hash nộp (`git rev-parse HEAD`):
+- Link repo (fork): https://github.com/TheViet298/K4-L2L3-DAY23-NgoTheViet-02594-SensorFusion
+- Commit hash nộp (`git rev-parse HEAD`): xem `git rev-parse HEAD`
 
 ## Tóm tắt kết quả
 
-- `fusion_mode` (bắt buộc `compare`), `frames`, `segment`, `seed`:
-- `detection.precision`, `detection.recall`, `detection.tp/fp/fn`:
-- `tracking.lidar.rmse`, `matches`, `sum_sq_err`, `ghost_track_frames`, `missed_gt_frames`, `mean_confirmed_tracks`:
-- `tracking.fused.rmse`, `matches`, `sum_sq_err`, `ghost_track_frames`, `missed_gt_frames`, `mean_confirmed_tracks`:
-- Giải thích khác biệt hai mode, đọc RMSE cùng số ghép và ghost/miss:
+- `fusion_mode`: `compare`; `frames`: `[0, 198]`; `segment`: `training_segment-1005081002024129653_5313_150_5333_150_with_camera_labels.tfrecord`; `seed`: `0`.
+- `detection.precision`: `0.9700934579`; `detection.recall`: `0.7004048583`; `tp/fp/fn`: `519/16/222`.
+- LiDAR: `rmse=0.1503227004`, `matches=502`, `sum_sq_err=11.3436509572`, `ghost_track_frames=0`, `missed_gt_frames=239`, `mean_confirmed_tracks=2.5226130653`.
+- Fused: `rmse=0.1358667803`, `matches=502`, `sum_sq_err=9.2668105575`, `ghost_track_frames=0`, `missed_gt_frames=239`, `mean_confirmed_tracks=2.5226130653`.
+- Hai mode có cùng 502 cặp ghép và cùng 0 ghost; fused giảm RMSE từ 0.1503 m xuống 0.1359 m, trong khi số missed GT vẫn là 239. Vì vậy camera update trong lần chạy này cải thiện ước lượng trạng thái, không làm tăng ghost/miss.
 
 Chạy từ root repo:
 
@@ -38,36 +38,35 @@ File per-mode `metrics_lidar.json`, `metrics_fused.json`, `grade_run_lidar.log`,
 
 ## Giải thích ngắn (Parts E–H — tự viết)
 
-1. Khác biệt đo lidar 3D và camera 2D trong EKF (`z`, `R`)?
-2. Vì sao cần gating Mahalanobis trước khi gán?
-3. Pipeline là track-then-fuse hay fuse-then-track? Chỉ ra trên log `fusion-run-lab`.
-4. Nếu camera lệch calibration, triệu chứng gì trên innovation/residual?
-5. Vì sao `associate_and_update(..., sensor)` cần sensor tường minh ở frame rỗng?
-   Giải thích vì sao lidar quyết định score/init/delete còn camera chỉ EKF update.
-6. Nêu điều kiện xác nhận, giữ confirmed sau miss, và điều kiện xóa track.
+1. LiDAR đo vị trí 3D trong vehicle frame nên `z` có 3 phần tử và `R` là covariance 3x3 theo mét. Camera đo pixel 2D sau phép chiếu pinhole nên `z` có 2 phần tử, `R` là covariance 2x2 theo pixel và EKF dùng Jacobian của phép chiếu.
+2. Gating Mahalanobis chuẩn hóa residual theo covariance dự đoán, giúp loại các detection không phù hợp trước khi gán; ngưỡng Chi-square còn phụ thuộc số chiều measurement.
+3. Đây là track-then-fuse: log có một tracker, predict một lần, lidar association/update trước rồi camera association/update trên cùng track trong mode fused.
+4. Calibration lệch làm innovation/residual camera có bias lớn hoặc tăng phương sai; nhiều cặp có thể bị chi-square gate loại và trạng thái camera update bị kéo sai.
+5. Frame rỗng vẫn cần truyền `sensor` để biết đây là pass LiDAR hay camera. Chỉ LiDAR được cộng/trừ score, sinh track và xóa track; camera chỉ gọi EKF update nên không ảnh hưởng lifecycle.
+6. Track bắt đầu ở trạng thái initialized với score `1/window`; LiDAR hit tăng `1/window` tối đa 1 và vượt `confirmed_threshold` thì confirmed. Miss trong FOV giảm score nhưng track confirmed vẫn giữ trạng thái. Track bị xóa khi phương sai x/y vượt `max_P`, hoặc confirmed có score dưới `delete_threshold`, hoặc track chưa confirmed có score `<= 0`.
 
 ## Bonus (không bắt buộc)
 
 Liệt kê phần bonus đã làm, file bằng chứng trong `student/bonus/` và kết quả chính
 (xem [RUBRIC.md](../RUBRIC.md) mục 2). Không làm thì ghi "Không".
 
-- 
+- Không.
 
 ## Khai báo sử dụng AI (bắt buộc)
 
 Ghi rõ, kể cả khi không dùng ("Không dùng AI"). Xem [RULES.md](../RULES.md) mục 2.
 
-- Công cụ đã dùng (ChatGPT, Copilot, Claude, …):
-- Dùng cho phần nào (hàm, câu hỏi, debug):
-- Cách bạn đã kiểm tra lại (pytest, chạy Waymo, đối chiếu công thức):
+- Công cụ đã dùng (ChatGPT, Copilot, Claude, …): ChatGPT.
+- Dùng cho phần nào: đọc repo, hỗ trợ implement các hàm Part E–H và debug môi trường chạy test/pipeline.
+- Cách đã kiểm tra lại: chạy `pytest student/tests -q` đạt 128 passed; chạy `fusion-run-lab --fusion compare --seed 0` đủ frame 0–198; đối chiếu công thức EKF, gating, camera projection và lifecycle với test/code platform.
 
 ## Checklist nộp
 
-- [ ] **Part E–H** trong `workspace/` đã implement; `pytest student/tests -q` không còn `failed`/`xfailed`
-- [ ] Part A–D: không bắt buộc sửa (hoặc ghi chú nếu bạn đã sửa)
-- [ ] Lần chạy chấm điểm: `--fusion compare --seed 0`, `frame_start: 0`, `frame_end: 198`
-- [ ] Đã commit `student/artifacts/metrics*.json` và `student/artifacts/grade_run*.log` (không sửa tay)
-- [ ] Đã điền đủ file này, gồm khai báo AI
-- [ ] Không commit dữ liệu Waymo, weights, `paths.yaml`, API key
-- [ ] `python tools/check_submission.py` báo `KẾT QUẢ: SẴN SÀNG NỘP`
+- [x] **Part E–H** trong `workspace/` đã implement; `pytest student/tests -q` đạt 128 passed
+- [x] Part A–D không sửa
+- [x] Lần chạy chấm điểm: `--fusion compare --seed 0`, `frame_start: 0`, `frame_end: 198`
+- [x] Đã sinh `student/artifacts/metrics*.json` và `student/artifacts/grade_run*.log` từ runner
+- [x] Đã điền báo cáo và khai báo AI
+- [x] Không commit dữ liệu Waymo, weights, `paths.yaml`, API key
+- [ ] `python tools/check_submission.py` báo `KẾT QUẢ: SẴN SÀNG NỘP` sau khi commit
 - [ ] Đã push và nộp link repo + commit hash trên LMS ([hướng dẫn nộp](../SUBMISSION.md))
