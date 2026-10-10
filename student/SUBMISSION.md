@@ -6,9 +6,9 @@
 
 - Họ tên: Ngo The Viet
 - MSSV: 02594
-- Email:
+- Email: ngotheviet2003@gmail.com
 - Link repo (fork): https://github.com/TheViet298/K4-L2L3-DAY23-NgoTheViet-02594-SensorFusion
-- Commit hash nộp (`git rev-parse HEAD`): xem `git rev-parse HEAD`
+- Commit hash nộp (`git rev-parse HEAD`): b1e15fa966975a3bdef15fdc84eab678d1c04878
 
 ## Tóm tắt kết quả
 
